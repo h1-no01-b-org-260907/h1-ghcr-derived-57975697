@@ -34,7 +34,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MARKER: ${{ inputs.marker }}
-          IMAGE: ghcr.io/h1-no01-a-org-260907/h1-ghcr-derived-pkg-57975697
+          IMAGE: ghcr.io/h1-no01-a-org-260907/h1-ghcr-derived-pkg-57975697-r2
           TAG: ${{ inputs.tag }}
         run: |
           printf '%s\n' "$MARKER" > marker.txt
@@ -45,7 +45,7 @@ jobs:
         if: inputs.mode == 'capture'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PACKAGE: h1-no01-a-org-260907/h1-ghcr-derived-pkg-57975697
+          PACKAGE: h1-no01-a-org-260907/h1-ghcr-derived-pkg-57975697-r2
         run: |
           response="$(curl -fsS -u "$GITHUB_ACTOR:$GH_TOKEN" --get --data-urlencode 'service=ghcr.io' --data-urlencode "scope=repository:$PACKAGE:pull,push" https://ghcr.io/token)"
           registry_token="$(printf '%s' "$response" | jq -r '.token')"
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: inputs.mode == 'capture'
         with:
-          name: controlled-derived-capability
+          name: controlled-derived-capability-r2
           path: captured.json
           retention-days: 1
       - name: Hold capability live for transfer
